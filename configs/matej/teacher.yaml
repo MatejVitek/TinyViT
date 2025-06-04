@@ -1,0 +1,24 @@
+MODEL:
+  TYPE: clip_vit_large14_224
+  NUM_CLASSES: 120
+
+DATA:
+  MEAN_AND_STD_TYPE: vessels
+  DATASET: SBVPI
+  NORMALIZE: False
+
+TRAIN:
+  EPOCHS: 300
+
+TEST:
+  CROP: False
+
+AUG:
+  MIXUP: 0.0
+  CUTMIX: 0.0
+  HFLIP: 0.0
+  AUTO_AUGMENT: none
+  ROTATE: 15
+  TRANSLATE: 0.1
+  SCALE: 1.2
+  SHEAR: 5

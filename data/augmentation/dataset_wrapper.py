@@ -17,6 +17,7 @@ class DatasetWrapper(torch.utils.data.Dataset):
     def __init__(self, dataset, logits_path, topk, write):
         super().__init__()
         self.dataset = dataset
+        self.transform = dataset.transform
         self.logits_path = logits_path
         self.epoch = multiprocessing.Value('i', 0)
         self.topk = topk

@@ -13,6 +13,8 @@ import argparse
 import datetime
 from collections import defaultdict
 import numpy as np
+from pathlib import Path
+import platform
 
 import torch
 import torch.backends.cudnn as cudnn
@@ -41,6 +43,9 @@ def parse_option():
                         action='store_true', help='Skip evaluation')
 
     args = parser.parse_args()
+    for k, v in vars(args).items():
+        if isinstance(v, Path):
+            setattr(args, k, str(v))
 
     config = get_config(args)
 
@@ -307,7 +312,11 @@ if __name__ == '__main__':
 
     torch.cuda.set_device(config.LOCAL_RANK)
     torch.distributed.init_process_group(
-        backend='nccl', init_method='env://', world_size=world_size, rank=rank)
+        backend='gloo' if platform.system().lower() == 'windows' else 'nccl',
+        init_method='env://',
+        world_size=world_size,
+        rank=rank
+    )
     torch.distributed.barrier()
 
     # The seed changes with config, rank, world_size and epoch

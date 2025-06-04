@@ -8,7 +8,7 @@ from .tiny_vit import TinyViT
 
 def build_model(config):
     model_type = config.MODEL.TYPE
-    if model_type == 'tiny_vit':
+    if model_type == 'tiny_vit' or model_type == 'sclera_vit':
         M = config.MODEL.TINY_VIT
         model = TinyViT(img_size=config.DATA.IMG_SIZE,
                         in_chans=M.IN_CHANS,
@@ -24,6 +24,7 @@ def build_model(config):
                         mbconv_expand_ratio=M.MBCONV_EXPAND_RATIO,
                         local_conv_size=M.LOCAL_CONV_SIZE,
                         layer_lr_decay=config.TRAIN.LAYER_LR_DECAY,
+                        gaze_head=model_type == 'sclera_vit'
                         )
     elif model_type == 'clip_vit_large14_224':
         from .clip import CLIP

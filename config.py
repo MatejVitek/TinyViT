@@ -3,7 +3,7 @@
 # Copyright (c) 2022 Microsoft
 # Based on the code: Swin Transformer
 #   (https://github.com/microsoft/swin-transformer)
-# Adapted for TinyViT
+# Adapted for ScleraViT
 # --------------------------------------------------------
 
 import os
@@ -39,6 +39,8 @@ _C.DATA.NUM_WORKERS = 8
 _C.DATA.FNAME_FORMAT = '{}.jpeg'
 # Data debug, when debug is True, only use few images
 _C.DATA.DEBUG = False
+# Normalize image
+_C.DATA.NORMALIZE = True
 
 
 # -----------------------------------------------------------------------------
@@ -151,6 +153,13 @@ _C.AUG.MIXUP_PROB = 1.0
 _C.AUG.MIXUP_SWITCH_PROB = 0.5
 # How to apply mixup/cutmix params. Per "batch", "pair", or "elem"
 _C.AUG.MIXUP_MODE = 'batch'
+# Horizontal flip probability
+_C.AUG.HFLIP = 0.5
+# RandomAffine params (None for disabled)
+_C.AUG.ROTATE = 0         # Degrees
+_C.AUG.TRANSLATE = None   # Fraction of image size
+_C.AUG.SCALE = None       # Fraction of image size (scale range will be [1/x, x])
+_C.AUG.SHEAR = None       # Degrees
 
 # -----------------------------------------------------------------------------
 # Testing settings
@@ -169,7 +178,7 @@ _C.AMP_ENABLE = True
 _C.OUTPUT = ''
 # Tag of experiment, overwritten by command line argument
 _C.TAG = 'default'
-# Frequency to save checkpoint
+# Frequency to save checkpoint (0 to save best and final only)
 _C.SAVE_FREQ = 1
 # Frequency to logging info
 _C.PRINT_FREQ = 10
@@ -214,6 +223,8 @@ def update_config(config, args):
         config.MODEL.PRETRAINED = args.pretrained
     if args.resume:
         config.MODEL.RESUME = args.resume
+    if args.teacher_logits:
+        config.DISTILL.TEACHER_LOGITS_PATH = args.teacher_logits
     if args.accumulation_steps:
         config.TRAIN.ACCUMULATION_STEPS = args.accumulation_steps
     if args.use_checkpoint:

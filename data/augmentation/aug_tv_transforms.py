@@ -179,7 +179,7 @@ class Resize(object):
             ``PIL.Image.BILINEAR``
     """
 
-    def __init__(self, size, interpolation=Image.BILINEAR):
+    def __init__(self, size, interpolation=F.InterpolationMode.BILINEAR):
         assert isinstance(size, int) or (isinstance(size, Iterable) and len(size) == 2)
         self.size = size
         self.interpolation = interpolation
@@ -542,7 +542,7 @@ class RandomResizedCrop(object):
         interpolation: Default: PIL.Image.BILINEAR
     """
 
-    def __init__(self, size, scale=(0.08, 1.0), ratio=(3. / 4., 4. / 3.), interpolation=Image.BILINEAR):
+    def __init__(self, size, scale=(0.08, 1.0), ratio=(3. / 4., 4. / 3.), interpolation=F.InterpolationMode.BILINEAR):
         if isinstance(size, tuple):
             self.size = size
         else:

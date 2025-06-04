@@ -7,8 +7,8 @@
 # --------------------------------------------------------
 
 import os
+import re
 import torch
-import numpy as np
 import torch.distributed as dist
 from torchvision import datasets, transforms
 from timm.data.constants import \
@@ -41,6 +41,13 @@ try:
         else:
             # default bilinear, do we want to allow nearest?
             return InterpolationMode.BILINEAR
+
+    # When we do this, let's also replace the stuff in timm so we don't get warnings
+    import timm.data.transforms
+    timm.data.transforms._pil_interp = _pil_interp
+    timm.data.transforms._RANDOM_INTERPOLATION = (InterpolationMode.BILINEAR, InterpolationMode.BICUBIC)
+    timm.data.transforms._pil_interpolation_to_str = {x: str(x) for x in InterpolationMode}
+
 except:
     from timm.data.transforms import _pil_interp
 
@@ -148,6 +155,12 @@ def build_dataset(is_train, config):
             config.DATA.DATA_PATH = old_data_path
             config.DATA.DATASET = 'imagenet22k'
             config.freeze()
+    elif config.DATA.DATASET == 'SBVPI':
+        prefix = 'train' if is_train else 'val'
+        root = os.path.join(config.DATA.DATA_PATH, prefix)
+        dataset_cls = GazeImageFolder if 'sclera' in config.MODEL.TYPE else datasets.ImageFolder
+        dataset = dataset_cls(root, transform=transform)
+        nb_classes = 120
     else:
         raise NotImplementedError("We only support ImageNet Now.")
 
@@ -161,6 +174,8 @@ def build_transform(is_train, config):
     rgbs = dict(
         default=(IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD),
         inception=(IMAGENET_INCEPTION_MEAN, IMAGENET_INCEPTION_STD),
+        vessels=((0.02150800515, 0.02150800515, 0.02150800515),
+                 (0.08962027092, 0.08962027092, 0.08962027092)),
         clip=((0.48145466, 0.4578275, 0.40821073),
               (0.26862954, 0.26130258, 0.27577711)),
     )
@@ -169,25 +184,35 @@ def build_transform(is_train, config):
     if is_train:
         # this should always dispatch to transforms_imagenet_train
         create_transform_t = create_transform if not config.DISTILL.ENABLED else create_transform_record
-        transform = create_transform_t(
+        t1, t2, t3 = create_transform_t(
             input_size=config.DATA.IMG_SIZE,
             is_training=True,
             color_jitter=config.AUG.COLOR_JITTER if config.AUG.COLOR_JITTER > 0 else None,
             auto_augment=config.AUG.AUTO_AUGMENT if config.AUG.AUTO_AUGMENT != 'none' else None,
+            hflip=config.AUG.HFLIP,
             re_prob=config.AUG.REPROB,
             re_mode=config.AUG.REMODE,
             re_count=config.AUG.RECOUNT,
             interpolation=config.DATA.INTERPOLATION,
             mean=mean,
             std=std,
+            separate=True,
         )
         if not resize_im:
             # replace RandomResizedCropAndInterpolation with
             # RandomCrop
-            transform.transforms[0] = transforms.RandomCrop(
+            t1.transforms[0] = transforms.RandomCrop(
                 config.DATA.IMG_SIZE, padding=4)
+        t2.transforms.append(transforms.RandomAffine(
+            degrees=config.AUG.ROTATE,
+            translate=(config.AUG.TRANSLATE, config.AUG.TRANSLATE) if config.AUG.TRANSLATE is not None else None,
+            scale=(1 / config.AUG.SCALE, config.AUG.SCALE) if config.AUG.SCALE is not None else None,
+            shear=config.AUG.SHEAR,
+            interpolation=_pil_interp(config.DATA.INTERPOLATION)))
+        if not config.DATA.NORMALIZE:
+            del t3.transforms[1]
 
-        return transform
+        return transforms.Compose(t1.transforms + t2.transforms + t3.transforms)
 
     t = []
     if resize_im:
@@ -206,6 +231,15 @@ def build_transform(is_train, config):
             )
 
     t.append(transforms.ToTensor())
-    t.append(transforms.Normalize(mean, std))
+    if config.DATA.NORMALIZE:
+        t.append(transforms.Normalize(mean, std))
     transform = transforms.Compose(t)
     return transform
+
+
+class GazeImageFolder(datasets.ImageFolder):
+    def __init__(self, *args, **kw):
+        super().__init__(*args, **kw)
+        for i, sample in enumerate(self.samples):
+            gaze = 'lrsu'.index(re.search(r'\d+[LR]_([lrsu])_\d', sample[0]).group(1))
+            self.samples[i] = (sample[0], (sample[1], gaze))

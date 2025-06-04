@@ -455,6 +455,7 @@ class TinyViT(nn.Module):
                  mbconv_expand_ratio=4.0,
                  local_conv_size=3,
                  layer_lr_decay=1.0,
+                 gaze_head=False,
                  ):
         super().__init__()
 
@@ -511,6 +512,7 @@ class TinyViT(nn.Module):
         self.norm_head = nn.LayerNorm(embed_dims[-1])
         self.head = nn.Linear(
             embed_dims[-1], num_classes) if num_classes > 0 else torch.nn.Identity()
+        self.gaze_head = nn.Linear(embed_dims[-1], 4) if gaze_head else None
 
         # init weights
         self.apply(self._init_weights)
@@ -538,8 +540,9 @@ class TinyViT(nn.Module):
                 layer.downsample.apply(
                     lambda x: _set_lr_scale(x, lr_scales[i - 1]))
         assert i == depth
-        for m in [self.norm_head, self.head]:
-            m.apply(lambda x: _set_lr_scale(x, lr_scales[-1]))
+        for m in [self.norm_head, self.head, self.gaze_head]:
+            if m is not None:
+                m.apply(lambda x: _set_lr_scale(x, lr_scales[-1]))
 
         for k, p in self.named_parameters():
             p.param_name = k
@@ -581,8 +584,11 @@ class TinyViT(nn.Module):
     def forward(self, x):
         x = self.forward_features(x)
         x = self.norm_head(x)
-        x = self.head(x)
-        return x
+        out = self.head(x)
+        if self.gaze_head is None:
+            return out
+        gaze_out = self.gaze_head(x)
+        return out, gaze_out
 
 
 _checkpoint_url_format = \
